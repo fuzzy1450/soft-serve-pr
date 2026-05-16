@@ -21,6 +21,7 @@ type datastore struct {
 	*collabStore
 	*branchCollabStore
 	*protectedBranchStore
+	*pullRequestStore
 	*lfsStore
 	*accessTokenStore
 	*webhookStore
@@ -43,6 +44,7 @@ func New(ctx context.Context, db *db.DB) store.Store {
 		collabStore:          &collabStore{},
 		branchCollabStore:    &branchCollabStore{},
 		protectedBranchStore: &protectedBranchStore{},
+		pullRequestStore:     &pullRequestStore{},
 		lfsStore:             &lfsStore{},
 		accessTokenStore:     &accessTokenStore{},
 	}
