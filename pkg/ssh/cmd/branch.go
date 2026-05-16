@@ -22,6 +22,12 @@ func branchCommand() *cobra.Command {
 		branchListCommand(),
 		branchDefaultCommand(),
 		branchDeleteCommand(),
+		branchGrantCommand(),
+		branchRevokeCommand(),
+		branchGrantsCommand(),
+		branchProtectCommand(),
+		branchUnprotectCommand(),
+		branchProtectedCommand(),
 	)
 
 	return cmd

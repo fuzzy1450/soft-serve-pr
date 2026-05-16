@@ -97,7 +97,9 @@ var (
 
 			switch cmdName {
 			case hooks.PreReceiveHook:
-				hks.PreReceive(ctx, stdout, stderr, repoName, opts)
+				if err := hks.PreReceive(ctx, stdout, stderr, repoName, opts); err != nil {
+					return err
+				}
 			case hooks.PostReceiveHook:
 				hks.PostReceive(ctx, stdout, stderr, repoName, opts)
 			}
@@ -107,11 +109,13 @@ var (
 				break
 			}
 
-			hks.Update(ctx, stdout, stderr, repoName, hooks.HookArg{
+			if err := hks.Update(ctx, stdout, stderr, repoName, hooks.HookArg{
 				RefName: args[0],
 				OldSha:  args[1],
 				NewSha:  args[2],
-			})
+			}); err != nil {
+				return err
+			}
 		case hooks.PostUpdateHook:
 			hks.PostUpdate(ctx, stdout, stderr, repoName, args...)
 		}
