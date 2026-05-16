@@ -5,6 +5,7 @@ type Store interface {
 	RepositoryStore
 	UserStore
 	CollaboratorStore
+	BranchCollabStore
 	SettingStore
 	LFSStore
 	AccessTokenStore
