@@ -101,6 +101,41 @@ func TestListPRs_FiltersByStatus(t *testing.T) {
 	}
 }
 
+func TestMergePR_HappyPath(t *testing.T) {
+	ctx, be := setupBackend(t)
+	mkUserRepoWithLinearHistory(t, be, "demo", "main", "feature/x")
+	owner, _ := be.User(ctx, "owner-merge")
+	ownerCtx := proto.WithUserContext(ctx, owner)
+
+	pr, err := be.OpenPR(ownerCtx, "demo", "feature/x", "main", "Add x", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	merged, err := be.MergePR(ownerCtx, "demo", pr.Number)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if merged.Status != models.PRStatusMerged {
+		t.Fatalf("want merged, got %v", merged.Status)
+	}
+	if !merged.MergeCommitSha.Valid {
+		t.Fatal("merge_commit_sha must be set")
+	}
+}
+
+func TestMergePR_NotOpen(t *testing.T) {
+	ctx, be := setupBackend(t)
+	mkUserRepoWithLinearHistory(t, be, "demo", "main", "feature/x")
+	owner, _ := be.User(ctx, "owner-merge")
+	ownerCtx := proto.WithUserContext(ctx, owner)
+
+	pr, _ := be.OpenPR(ownerCtx, "demo", "feature/x", "main", "x", "")
+	_ = be.ClosePR(ownerCtx, "demo", pr.Number)
+	if _, err := be.MergePR(ownerCtx, "demo", pr.Number); !errors.Is(err, proto.ErrPRNotOpen) {
+		t.Fatalf("want ErrPRNotOpen, got %v", err)
+	}
+}
+
 // seedRepoWithBranches creates one commit per branch (each branch is a
 // disconnected root with a unique blob). Uses shell-out to system git, which
 // soft-serve already requires. The repo's bare git dir was created by

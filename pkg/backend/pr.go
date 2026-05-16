@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/charmbracelet/soft-serve/pkg/db"
 	"github.com/charmbracelet/soft-serve/pkg/db/models"
@@ -93,4 +94,40 @@ func (d *Backend) ClosePR(ctx context.Context, repo string, number int64) error 
 	return db.WrapError(d.db.TransactionContext(ctx, func(tx *db.Tx) error {
 		return d.store.SetPRStatusClosed(ctx, tx, pr.ID)
 	}))
+}
+
+// MergePR merges an open PR's source into target. Caller-side auth (i.e.,
+// "does the merger have ReadWriteAccess on target?") lives in the SSH command
+// layer (Task 14) so that direct backend invocation in tests is unencumbered.
+func (d *Backend) MergePR(ctx context.Context, repo string, number int64) (models.PullRequest, error) {
+	pr, err := d.GetPR(ctx, repo, number)
+	if err != nil {
+		return models.PullRequest{}, err
+	}
+	if pr.Status != models.PRStatusOpen {
+		return models.PullRequest{}, proto.ErrPRNotOpen
+	}
+
+	merger := proto.UserFromContext(ctx)
+	if merger == nil {
+		return models.PullRequest{}, proto.ErrUnauthorized
+	}
+
+	msg := fmt.Sprintf("Merge pull request #%d: %s", pr.Number, pr.Title)
+	if pr.Body != "" {
+		msg += "\n\n" + pr.Body
+	}
+
+	res, err := d.performMerge(ctx, repo, pr.SourceBranch, pr.TargetBranch, merger.Username(), msg, "")
+	if err != nil {
+		return models.PullRequest{}, err
+	}
+
+	if err := db.WrapError(d.db.TransactionContext(ctx, func(tx *db.Tx) error {
+		return d.store.SetPRStatusMerged(ctx, tx, pr.ID, res.MergeCommitSha)
+	})); err != nil {
+		return models.PullRequest{}, err
+	}
+
+	return d.GetPR(ctx, repo, pr.Number)
 }
