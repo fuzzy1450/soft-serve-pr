@@ -252,9 +252,14 @@ func withAccess(next http.Handler) http.HandlerFunc {
 		// - git-upload-pack
 		// - git-receive-pack
 		// - git-lfs
+		// Admit at the session gate if the user has any branch grant on the
+		// repo (precise per-ref enforcement still runs in the Update hook).
+		canPushSession := accessLevel >= access.ReadWriteAccess ||
+			(user != nil && be.HasBranchGrant(ctx, repoName, user.Username()))
+
 		switch {
 		case service == git.ReceivePackService:
-			if accessLevel < access.ReadWriteAccess {
+			if !canPushSession {
 				askCredentials(w, r)
 				renderUnauthorized(w, r)
 				return

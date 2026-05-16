@@ -182,6 +182,27 @@ func (d *Backend) UnprotectBranch(ctx context.Context, repo, pattern string) err
 	)
 }
 
+// HasBranchGrant reports whether the user has any branch grant on the repo.
+// Used at the SSH/HTTP session gates to admit users who would otherwise be
+// rejected for lack of repo-level write access, while leaving precise per-ref
+// enforcement to the Update hook.
+func (d *Backend) HasBranchGrant(ctx context.Context, repo, username string) bool {
+	if username == "" {
+		return false
+	}
+	repo = utils.SanitizeRepo(repo)
+	var has bool
+	_ = d.db.TransactionContext(ctx, func(tx *db.Tx) error {
+		rows, err := d.store.ListBranchCollabsForUserAndRepo(ctx, tx, username, repo)
+		if err != nil {
+			return err
+		}
+		has = len(rows) > 0
+		return nil
+	})
+	return has
+}
+
 // ListProtectedBranches lists protected branch patterns.
 func (d *Backend) ListProtectedBranches(ctx context.Context, repo string) ([]models.ProtectedBranch, error) {
 	repo = utils.SanitizeRepo(repo)

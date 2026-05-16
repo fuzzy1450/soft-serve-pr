@@ -228,13 +228,20 @@ func gitRunE(cmd *cobra.Command, args []string) error {
 		Dir:    repoPath,
 	}
 
+	// Admit at the session gate if the user has any branch grant on the repo
+	// (precise per-ref enforcement still runs in the Update hook). Without
+	// this, a contributor with only a branch grant gets rejected before the
+	// hook can evaluate the ref they are pushing.
+	canPushSession := accessLevel >= access.ReadWriteAccess ||
+		(user != nil && be.HasBranchGrant(ctx, name, user.Username()))
+
 	switch service {
 	case git.ReceivePackService:
 		receivePackCounter.WithLabelValues(name).Inc()
 		defer func() {
 			receivePackSeconds.WithLabelValues(name).Add(time.Since(start).Seconds())
 		}()
-		if accessLevel < access.ReadWriteAccess {
+		if !canPushSession {
 			return git.ErrNotAuthed
 		}
 		if repo == nil {

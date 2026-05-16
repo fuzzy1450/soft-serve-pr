@@ -160,3 +160,47 @@ func mustUser(t *testing.T, ctx context.Context, be *Backend, username string) p
 	}
 	return u
 }
+
+func TestHasBranchGrant(t *testing.T) {
+	ctx, be := setupBackend(t)
+
+	owner, err := be.CreateUser(ctx, "owner", proto.UserOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := be.CreateUser(ctx, "carol", proto.UserOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	enrichedCtx := db.WithContext(store.WithContext(proto.WithUserContext(ctx, owner), be.store), be.db)
+	if _, err := be.CreateRepository(enrichedCtx, "demo", owner, proto.RepositoryOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Empty username → false.
+	if be.HasBranchGrant(ctx, "demo", "") {
+		t.Error("empty username: want false, got true")
+	}
+
+	// No grants yet → false.
+	if be.HasBranchGrant(ctx, "demo", "carol") {
+		t.Error("carol with no grant: want false, got true")
+	}
+
+	// Non-existent repo → false.
+	if be.HasBranchGrant(ctx, "missing", "carol") {
+		t.Error("missing repo: want false, got true")
+	}
+
+	// Add a grant → true.
+	if err := be.AddBranchCollab(enrichedCtx, "demo", "carol", "feature/*", access.ReadWriteAccess); err != nil {
+		t.Fatal(err)
+	}
+	if !be.HasBranchGrant(ctx, "demo", "carol") {
+		t.Error("carol with grant on feature/*: want true, got false")
+	}
+
+	// Different user without a grant → still false.
+	if be.HasBranchGrant(ctx, "demo", "owner") {
+		t.Error("owner has no branch grant row: want false, got true")
+	}
+}
