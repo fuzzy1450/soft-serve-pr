@@ -55,20 +55,15 @@ func (d *Backend) BranchAccessLevelForUser(ctx context.Context, repo string, use
 		}
 	}
 
-	// 5. Protected check.
+	// 5. Protected check. Write requires an explicit grant; reads fold in repo-level access.
 	if d.branchIsProtected(ctx, repo, branchName) {
-		// Write: only branch grant counts; read: max of repo and branch.
-		// We collapse into a single AccessLevel return: take branchLvl, but
-		// if repoLvl grants read, fold it in for reads only.
 		if branchLvl >= access.ReadWriteAccess {
 			return branchLvl
 		}
-		// No write grant on a protected branch. Preserve repo-level read if any.
-		if repoLvl > branchLvl {
-			// Cap at ReadOnlyAccess for writes by callers; we expose at most ReadOnlyAccess.
-			if repoLvl >= access.ReadOnlyAccess {
-				return access.ReadOnlyAccess
-			}
+		// No write grant on a protected branch. If repo-level access grants any read,
+		// preserve it (capped at ReadOnlyAccess so writes remain blocked).
+		if repoLvl >= access.ReadOnlyAccess {
+			return access.ReadOnlyAccess
 		}
 		return branchLvl
 	}
@@ -105,6 +100,7 @@ func (d *Backend) branchIsProtected(ctx context.Context, repo, branchName string
 		for _, p := range rows {
 			gl, err := glob.Compile(p.BranchPattern)
 			if err != nil {
+				d.logger.Warn("invalid protected branch pattern", "pattern", p.BranchPattern, "err", err)
 				continue
 			}
 			if gl.Match(branchName) {
