@@ -25,4 +25,16 @@ var (
 	ErrCollaboratorNotFound = errors.New("collaborator not found")
 	// ErrCollaboratorExist is returned when a collaborator already exists.
 	ErrCollaboratorExist = errors.New("collaborator already exists")
+
+	// ErrPRNotFound is returned when a pull request is not found.
+	ErrPRNotFound = errors.New("pull request not found")
+
+	// ErrPRNotOpen is returned for actions that require an open PR.
+	ErrPRNotOpen = errors.New("pull request is not open")
+
+	// ErrPRSameBranch is returned when source and target branches are equal.
+	ErrPRSameBranch = errors.New("source and target branches must differ")
+
+	// ErrPRBranchMissing is returned when a referenced branch does not exist.
+	ErrPRBranchMissing = errors.New("branch does not exist")
 )
