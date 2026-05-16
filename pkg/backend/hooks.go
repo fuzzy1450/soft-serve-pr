@@ -25,14 +25,15 @@ func (d *Backend) PostReceive(_ context.Context, _ io.Writer, _ io.Writer, repo 
 // PreReceive is called by the git pre-receive hook.
 //
 // It implements Hooks.
-func (d *Backend) PreReceive(_ context.Context, _ io.Writer, _ io.Writer, repo string, args []hooks.HookArg) {
+func (d *Backend) PreReceive(_ context.Context, _ io.Writer, _ io.Writer, repo string, args []hooks.HookArg) error {
 	d.logger.Debug("pre-receive hook called", "repo", repo, "args", args)
+	return nil
 }
 
 // Update is called by the git update hook.
 //
 // It implements Hooks.
-func (d *Backend) Update(ctx context.Context, _ io.Writer, _ io.Writer, repo string, arg hooks.HookArg) {
+func (d *Backend) Update(ctx context.Context, _ io.Writer, stderr io.Writer, repo string, arg hooks.HookArg) error {
 	d.logger.Debug("update hook called", "repo", repo, "arg", arg)
 
 	// Find user
@@ -41,31 +42,31 @@ func (d *Backend) Update(ctx context.Context, _ io.Writer, _ io.Writer, repo str
 		pk, _, err := sshutils.ParseAuthorizedKey(pubkey)
 		if err != nil {
 			d.logger.Error("error parsing public key", "err", err)
-			return
+			return nil
 		}
 
 		user, err = d.UserByPublicKey(ctx, pk)
 		if err != nil {
 			d.logger.Error("error finding user from public key", "key", pubkey, "err", err)
-			return
+			return nil
 		}
 	} else if username := os.Getenv("SOFT_SERVE_USERNAME"); username != "" {
 		var err error
 		user, err = d.User(ctx, username)
 		if err != nil {
 			d.logger.Error("error finding user from username", "username", username, "err", err)
-			return
+			return nil
 		}
 	} else {
 		d.logger.Error("error finding user")
-		return
+		return nil
 	}
 
 	// Get repo
 	r, err := d.Repository(ctx, repo)
 	if err != nil {
 		d.logger.Error("error finding repository", "repo", repo, "err", err)
-		return
+		return nil
 	}
 
 	// TODO: run this async
@@ -84,6 +85,9 @@ func (d *Backend) Update(ctx context.Context, _ io.Writer, _ io.Writer, repo str
 	} else if err := webhook.SendEvent(ctx, wh); err != nil {
 		d.logger.Error("error sending push webhook", "err", err)
 	}
+
+	_ = stderr // reserved for branch ACL rejection in Task 8
+	return nil
 }
 
 // PostUpdate is called by the git post-update hook.
