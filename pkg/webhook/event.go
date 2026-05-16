@@ -26,6 +26,15 @@ const (
 
 	// EventRepositoryVisibilityChange is a repository visibility change event.
 	EventRepositoryVisibilityChange Event = 6
+
+	// EventPullRequestOpened is a pull request opened event.
+	EventPullRequestOpened Event = 7
+
+	// EventPullRequestMerged is a pull request merged event.
+	EventPullRequestMerged Event = 8
+
+	// EventPullRequestClosed is a pull request closed event.
+	EventPullRequestClosed Event = 9
 )
 
 // Events return all events.
@@ -37,6 +46,9 @@ func Events() []Event {
 		EventPush,
 		EventRepository,
 		EventRepositoryVisibilityChange,
+		EventPullRequestOpened,
+		EventPullRequestMerged,
+		EventPullRequestClosed,
 	}
 }
 
@@ -47,6 +59,9 @@ var eventStrings = map[Event]string{
 	EventPush:                       "push",
 	EventRepository:                 "repository",
 	EventRepositoryVisibilityChange: "repository_visibility_change",
+	EventPullRequestOpened:          "pull_request_opened",
+	EventPullRequestMerged:          "pull_request_merged",
+	EventPullRequestClosed:          "pull_request_closed",
 }
 
 // String returns the string representation of the event.
@@ -61,6 +76,9 @@ var stringEvent = map[string]Event{
 	"push":                         EventPush,
 	"repository":                   EventRepository,
 	"repository_visibility_change": EventRepositoryVisibilityChange,
+	"pull_request_opened":          EventPullRequestOpened,
+	"pull_request_merged":          EventPullRequestMerged,
+	"pull_request_closed":          EventPullRequestClosed,
 }
 
 // ErrInvalidEvent is returned when the event is invalid.

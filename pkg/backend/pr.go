@@ -8,7 +8,9 @@ import (
 	"github.com/charmbracelet/soft-serve/pkg/db"
 	"github.com/charmbracelet/soft-serve/pkg/db/models"
 	"github.com/charmbracelet/soft-serve/pkg/proto"
+	"github.com/charmbracelet/soft-serve/pkg/store"
 	"github.com/charmbracelet/soft-serve/pkg/utils"
+	"github.com/charmbracelet/soft-serve/pkg/webhook"
 )
 
 // OpenPR opens a new pull request.
@@ -47,6 +49,13 @@ func (d *Backend) OpenPR(ctx context.Context, repo, source, target, title, body 
 	if err != nil {
 		return models.PullRequest{}, db.WrapError(err)
 	}
+
+	wctx := db.WithContext(store.WithContext(ctx, d.store), d.db)
+	wh, werr := webhook.NewPullRequestEvent(wctx, creator, r, pr, "opened")
+	if werr == nil {
+		_ = webhook.SendEvent(wctx, wh)
+	}
+
 	return pr, nil
 }
 
@@ -91,9 +100,27 @@ func (d *Backend) ClosePR(ctx context.Context, repo string, number int64) error 
 	if pr.Status != models.PRStatusOpen {
 		return proto.ErrPRNotOpen
 	}
-	return db.WrapError(d.db.TransactionContext(ctx, func(tx *db.Tx) error {
+	if err := db.WrapError(d.db.TransactionContext(ctx, func(tx *db.Tx) error {
 		return d.store.SetPRStatusClosed(ctx, tx, pr.ID)
-	}))
+	})); err != nil {
+		return err
+	}
+
+	closer := proto.UserFromContext(ctx)
+	r, rerr := d.Repository(ctx, repo)
+	if closer != nil && rerr == nil {
+		// Re-fetch the PR to get the updated status.
+		updatedPR, ferr := d.GetPR(ctx, repo, number)
+		if ferr == nil {
+			wctx := db.WithContext(store.WithContext(ctx, d.store), d.db)
+			wh, werr := webhook.NewPullRequestEvent(wctx, closer, r, updatedPR, "closed")
+			if werr == nil {
+				_ = webhook.SendEvent(wctx, wh)
+			}
+		}
+	}
+
+	return nil
 }
 
 // MergePR merges an open PR's source into target. Caller-side auth (i.e.,
@@ -129,5 +156,19 @@ func (d *Backend) MergePR(ctx context.Context, repo string, number int64) (model
 		return models.PullRequest{}, err
 	}
 
-	return d.GetPR(ctx, repo, pr.Number)
+	mergedPR, err := d.GetPR(ctx, repo, pr.Number)
+	if err != nil {
+		return models.PullRequest{}, err
+	}
+
+	r, rerr := d.Repository(ctx, repo)
+	if rerr == nil {
+		wctx := db.WithContext(store.WithContext(ctx, d.store), d.db)
+		wh, werr := webhook.NewPullRequestEvent(wctx, merger, r, mergedPR, "merged")
+		if werr == nil {
+			_ = webhook.SendEvent(wctx, wh)
+		}
+	}
+
+	return mergedPR, nil
 }
