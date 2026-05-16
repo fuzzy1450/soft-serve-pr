@@ -20,6 +20,7 @@ type datastore struct {
 	*userStore
 	*collabStore
 	*branchCollabStore
+	*protectedBranchStore
 	*lfsStore
 	*accessTokenStore
 	*webhookStore
@@ -36,13 +37,14 @@ func New(ctx context.Context, db *db.DB) store.Store {
 		db:     db,
 		logger: logger,
 
-		settingsStore:     &settingsStore{},
-		repoStore:         &repoStore{},
-		userStore:         &userStore{},
-		collabStore:       &collabStore{},
-		branchCollabStore: &branchCollabStore{},
-		lfsStore:          &lfsStore{},
-		accessTokenStore:  &accessTokenStore{},
+		settingsStore:        &settingsStore{},
+		repoStore:            &repoStore{},
+		userStore:            &userStore{},
+		collabStore:          &collabStore{},
+		branchCollabStore:    &branchCollabStore{},
+		protectedBranchStore: &protectedBranchStore{},
+		lfsStore:             &lfsStore{},
+		accessTokenStore:     &accessTokenStore{},
 	}
 
 	return s

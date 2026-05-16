@@ -6,6 +6,7 @@ type Store interface {
 	UserStore
 	CollaboratorStore
 	BranchCollabStore
+	ProtectedBranchStore
 	SettingStore
 	LFSStore
 	AccessTokenStore
