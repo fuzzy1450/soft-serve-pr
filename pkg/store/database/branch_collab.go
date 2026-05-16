@@ -15,6 +15,7 @@ type branchCollabStore struct{}
 
 var _ store.BranchCollabStore = (*branchCollabStore)(nil)
 
+// AddBranchCollab implements store.BranchCollabStore.
 func (*branchCollabStore) AddBranchCollab(ctx context.Context, tx db.Handler, username, repo, pattern string, level access.AccessLevel) error {
 	username = strings.ToLower(username)
 	if err := utils.ValidateUsername(username); err != nil {
@@ -33,6 +34,7 @@ func (*branchCollabStore) AddBranchCollab(ctx context.Context, tx db.Handler, us
 	return err
 }
 
+// RemoveBranchCollab implements store.BranchCollabStore.
 func (*branchCollabStore) RemoveBranchCollab(ctx context.Context, tx db.Handler, username, repo, pattern string) error {
 	username = strings.ToLower(username)
 	if err := utils.ValidateUsername(username); err != nil {
@@ -50,6 +52,7 @@ func (*branchCollabStore) RemoveBranchCollab(ctx context.Context, tx db.Handler,
 	return err
 }
 
+// ListBranchCollabsByRepo implements store.BranchCollabStore.
 func (*branchCollabStore) ListBranchCollabsByRepo(ctx context.Context, tx db.Handler, repo string) ([]models.BranchCollab, error) {
 	repo = utils.SanitizeRepo(repo)
 	var rows []models.BranchCollab
@@ -63,6 +66,7 @@ func (*branchCollabStore) ListBranchCollabsByRepo(ctx context.Context, tx db.Han
 	return rows, err
 }
 
+// ListBranchCollabsForUserAndRepo implements store.BranchCollabStore.
 func (*branchCollabStore) ListBranchCollabsForUserAndRepo(ctx context.Context, tx db.Handler, username, repo string) ([]models.BranchCollab, error) {
 	username = strings.ToLower(username)
 	if err := utils.ValidateUsername(username); err != nil {

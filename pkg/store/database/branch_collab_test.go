@@ -147,3 +147,21 @@ func TestBranchCollab_ListForUserAndRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestBranchCollab_DuplicateAddFails(t *testing.T) {
+	ctx, dbx := setupDB(t)
+	seedUserAndRepo(t, ctx, dbx, "alice", "demo")
+	s := &branchCollabStore{}
+
+	add := func() error {
+		return dbx.TransactionContext(ctx, func(tx *db.Tx) error {
+			return s.AddBranchCollab(ctx, tx, "alice", "demo", "feature/*", access.ReadWriteAccess)
+		})
+	}
+	if err := add(); err != nil {
+		t.Fatalf("first add: %v", err)
+	}
+	if err := add(); err == nil {
+		t.Fatal("want error on duplicate add, got nil")
+	}
+}
