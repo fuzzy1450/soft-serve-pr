@@ -106,11 +106,18 @@ func TestPullRequest_ListByStatus(t *testing.T) {
 	seedUserAndRepo(t, ctx, dbx, "alice", "demo")
 	s := &pullRequestStore{}
 
-	_ = dbx.TransactionContext(ctx, func(tx *db.Tx) error {
-		_, _ = s.CreatePR(ctx, tx, "demo", "alice", "f1", "main", "t1", "")
-		pr2, _ := s.CreatePR(ctx, tx, "demo", "alice", "f2", "main", "t2", "")
+	if err := dbx.TransactionContext(ctx, func(tx *db.Tx) error {
+		if _, err := s.CreatePR(ctx, tx, "demo", "alice", "f1", "main", "t1", ""); err != nil {
+			return err
+		}
+		pr2, err := s.CreatePR(ctx, tx, "demo", "alice", "f2", "main", "t2", "")
+		if err != nil {
+			return err
+		}
 		return s.SetPRStatusClosed(ctx, tx, pr2.ID)
-	})
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	open := models.PRStatusOpen
 	_ = dbx.TransactionContext(ctx, func(tx *db.Tx) error {
