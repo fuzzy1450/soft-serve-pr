@@ -2,11 +2,13 @@ package backend
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"sync"
 
 	"github.com/charmbracelet/soft-serve/git"
+	"github.com/charmbracelet/soft-serve/pkg/access"
 	"github.com/charmbracelet/soft-serve/pkg/hooks"
 	"github.com/charmbracelet/soft-serve/pkg/proto"
 	"github.com/charmbracelet/soft-serve/pkg/sshutils"
@@ -69,6 +71,19 @@ func (d *Backend) Update(ctx context.Context, _ io.Writer, stderr io.Writer, rep
 		return nil
 	}
 
+	// Check branch-level access.
+	lvl := d.BranchAccessLevelForUser(ctx, repo, user, arg.RefName)
+	if lvl < access.ReadWriteAccess {
+		msg := "refusing update of " + arg.RefName + ": insufficient access"
+		if d.branchIsProtected(ctx, repo, shortBranch(arg.RefName)) {
+			msg = "refusing update of " + arg.RefName + ": branch is protected and you have no grant"
+		}
+		if _, werr := stderr.Write([]byte(msg + "\n")); werr != nil {
+			d.logger.Error("write to stderr", "err", werr)
+		}
+		return errors.New(msg)
+	}
+
 	// TODO: run this async
 	// This would probably need something like an RPC server to communicate with the hook process.
 	if git.IsZeroHash(arg.OldSha) || git.IsZeroHash(arg.NewSha) {
@@ -86,7 +101,6 @@ func (d *Backend) Update(ctx context.Context, _ io.Writer, stderr io.Writer, rep
 		d.logger.Error("error sending push webhook", "err", err)
 	}
 
-	_ = stderr // reserved for branch ACL rejection in Task 8
 	return nil
 }
 
