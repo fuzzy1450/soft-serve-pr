@@ -79,7 +79,9 @@ Glob patterns use `github.com/gobwas/glob`, already vendored.
 
 Only `ReadWriteAccess` is meaningful on a branch grant in v1. `ReadOnlyAccess`
 on a branch is a no-op (reads are repo-level). `AdminAccess` on a branch is
-disallowed at the command layer to keep semantics clear.
+disallowed at the command layer to keep semantics clear. The `access_level`
+column is kept in the schema for forward compatibility; the SSH command
+layer rejects any value other than `ReadWriteAccess` in v1.
 
 #### Decision function
 
@@ -95,12 +97,14 @@ BranchAccessLevelForUser(ctx, repo, user, refName) AccessLevel
 4. `branchLvl = max(level)` over `branch_collabs` rows matching `(user, repo)`
    where any pattern glob-matches `refName`.
 5. If any `protected_branches` pattern for this repo glob-matches `refName`:
-     - Effective level = `branchLvl` (repo-level write is ignored on protected
-       branches).
-     - If `branchLvl` is unset, effective level for write actions is
-       `NoAccess`; reads still flow from `repoLvl`.
+     - For **write** decisions (push, merge): effective level = `branchLvl`
+       (unset → `NoAccess`). Repo-level write is ignored for protected
+       branches.
+     - For **read** decisions: effective level = `max(repoLvl, branchLvl)`.
+       Protection never blocks reads.
 6. Otherwise (unprotected):
-     - Effective level = `max(repoLvl, branchLvl)`. Branch grants only add.
+     - Effective level = `max(repoLvl, branchLvl)` for both read and write.
+       Branch grants only add.
 
 Reads are not gated by branch grants in v1. If a user can read the repo, they
 can read every branch.
@@ -174,8 +178,8 @@ indicator; the PR is not auto-closed.
 |--------------|--------------|
 | Open PR      | Read access on repo; both src and target exist; src ≠ target |
 | List / show  | Read access on repo |
-| Close        | Creator, anyone with effective write on target, or admin |
-| Merge        | `BranchAccessLevelForUser(merger, target) ≥ ReadWriteAccess` |
+| Close        | Creator, anyone with `BranchAccessLevelForUser(user, repo, target) ≥ ReadWriteAccess`, or admin |
+| Merge        | `BranchAccessLevelForUser(merger, repo, target) ≥ ReadWriteAccess` |
 
 ### 3. Server-side merge mechanism
 
@@ -303,7 +307,6 @@ Migration also gets a smoke test that idempotently applies and rolls back.
 - **Glob pattern footguns.** A wildly broad pattern like `*` in either table
   applies to all branches. Documented in the command help text; not
   prevented in code.
-- **Branch grants on deleted users / repos.** Foreign keys cascade.
 - **Reads of grant tables on every push.** The `Update` hook fires per ref;
   on a 500-ref push, the helper runs 500 times. The two grant tables are tiny
   per repo (rows ~= dozens at most). Indexed by `repo_id` this is negligible.
