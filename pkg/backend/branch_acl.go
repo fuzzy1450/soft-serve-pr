@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/soft-serve/pkg/access"
 	"github.com/charmbracelet/soft-serve/pkg/db"
+	"github.com/charmbracelet/soft-serve/pkg/db/models"
 	"github.com/charmbracelet/soft-serve/pkg/proto"
 	"github.com/charmbracelet/soft-serve/pkg/utils"
 	"github.com/gobwas/glob"
@@ -124,4 +125,71 @@ func shortBranch(refName string) string {
 		return refName[len(prefix):]
 	}
 	return refName
+}
+
+// AddBranchCollab grants a user write access on branches matching pattern.
+func (d *Backend) AddBranchCollab(ctx context.Context, repo, username, pattern string, level access.AccessLevel) error {
+	if level != access.ReadWriteAccess {
+		return access.ErrInvalidAccessLevel
+	}
+	repo = utils.SanitizeRepo(repo)
+	return db.WrapError(
+		d.db.TransactionContext(ctx, func(tx *db.Tx) error {
+			return d.store.AddBranchCollab(ctx, tx, username, repo, pattern, level)
+		}),
+	)
+}
+
+// RemoveBranchCollab revokes a branch grant.
+func (d *Backend) RemoveBranchCollab(ctx context.Context, repo, username, pattern string) error {
+	repo = utils.SanitizeRepo(repo)
+	return db.WrapError(
+		d.db.TransactionContext(ctx, func(tx *db.Tx) error {
+			return d.store.RemoveBranchCollab(ctx, tx, username, repo, pattern)
+		}),
+	)
+}
+
+// ListBranchCollabs lists all grants for a repo.
+func (d *Backend) ListBranchCollabs(ctx context.Context, repo string) ([]models.BranchCollab, error) {
+	repo = utils.SanitizeRepo(repo)
+	var rows []models.BranchCollab
+	err := d.db.TransactionContext(ctx, func(tx *db.Tx) error {
+		var err error
+		rows, err = d.store.ListBranchCollabsByRepo(ctx, tx, repo)
+		return err
+	})
+	return rows, db.WrapError(err)
+}
+
+// ProtectBranch marks a branch pattern as protected.
+func (d *Backend) ProtectBranch(ctx context.Context, repo, pattern string) error {
+	repo = utils.SanitizeRepo(repo)
+	return db.WrapError(
+		d.db.TransactionContext(ctx, func(tx *db.Tx) error {
+			return d.store.AddProtectedBranch(ctx, tx, repo, pattern)
+		}),
+	)
+}
+
+// UnprotectBranch removes branch protection.
+func (d *Backend) UnprotectBranch(ctx context.Context, repo, pattern string) error {
+	repo = utils.SanitizeRepo(repo)
+	return db.WrapError(
+		d.db.TransactionContext(ctx, func(tx *db.Tx) error {
+			return d.store.RemoveProtectedBranch(ctx, tx, repo, pattern)
+		}),
+	)
+}
+
+// ListProtectedBranches lists protected branch patterns.
+func (d *Backend) ListProtectedBranches(ctx context.Context, repo string) ([]models.ProtectedBranch, error) {
+	repo = utils.SanitizeRepo(repo)
+	var rows []models.ProtectedBranch
+	err := d.db.TransactionContext(ctx, func(tx *db.Tx) error {
+		var err error
+		rows, err = d.store.ListProtectedBranchesByRepo(ctx, tx, repo)
+		return err
+	})
+	return rows, db.WrapError(err)
 }

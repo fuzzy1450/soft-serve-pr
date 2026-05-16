@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/soft-serve/pkg/db"
 	"github.com/charmbracelet/soft-serve/pkg/db/migrate"
 	"github.com/charmbracelet/soft-serve/pkg/proto"
+	"github.com/charmbracelet/soft-serve/pkg/store"
 	"github.com/charmbracelet/soft-serve/pkg/store/database"
 )
 
@@ -116,7 +117,7 @@ func seedAclScenario(t *testing.T, ctx context.Context, be *Backend, tc aclCase)
 
 	// Create the repo under owner. If isOwner is true, switch alice to the owner.
 	ownerCtx := proto.WithUserContext(ctx, mustUser(t, ctx, be, "owner"))
-	if _, err := be.CreateRepository(ownerCtx, "demo", mustUser(t, ctx, be, "owner"), proto.RepositoryOptions{}); err != nil {
+	if _, err := be.CreateRepository(ownerCtx, "demo", mustUser(t, ctx, be, "owner"), proto.RepositoryOptions{Private: true}); err != nil {
 		t.Fatal(err)
 	}
 	if tc.isOwner {
@@ -127,10 +128,15 @@ func seedAclScenario(t *testing.T, ctx context.Context, be *Backend, tc aclCase)
 				"alice", "demo")
 			return err
 		})
+		// Evict the cached repo so the next lookup re-reads the updated user_id.
+		be.cache.Delete("demo")
 	}
 
 	if tc.repoLevel > access.NoAccess && !tc.isOwner {
-		if err := be.AddCollaborator(ctx, "demo", "alice", tc.repoLevel); err != nil {
+		// AddCollaborator's webhook path reads db/store from context.
+		collabCtx := db.WithContext(ownerCtx, be.db)
+		collabCtx = store.WithContext(collabCtx, be.store)
+		if err := be.AddCollaborator(collabCtx, "demo", "alice", tc.repoLevel); err != nil {
 			t.Fatal(err)
 		}
 	}
